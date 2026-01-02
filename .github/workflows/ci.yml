@@ -1,0 +1,35 @@
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: 
+      - self-hosted
+      - gpu
+      - linux
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: docker compose build app
+
+      - name: Start services
+        run: docker compose up -d
+
+      - name: Run GPU test
+        run: docker compose run --rm app python test.py
+
+      - name: Stop services
+        if: always()
+        run: docker compose down

@@ -215,8 +215,6 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Image files
-*.jpg
-!sample.jpg
-*.jpeg
-*.png
+# Data directory
+data/
+!data/input/sample.jpg

@@ -5,4 +5,5 @@ set -euo pipefail
 : "${APP_ENV:=production}"
 
 # Exec main command
-exec python src/process.py "$@"
+echo "Starting Perfect-Shot watcher..."
+exec python src/process.py

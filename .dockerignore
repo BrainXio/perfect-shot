@@ -1,0 +1,18 @@
+# .dockerignore
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+.git
+.gitignore
+README.md
+Dockerfile
+docker-compose.yml
+*.log
+venv/
+.env/
+data/
+mlflow-data/
+minio-data/
+*.db

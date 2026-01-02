@@ -1,42 +1,45 @@
-# Updated src/agent.py (fix inputs for vLLM + processor)
+# src/agent.py
 from vllm import LLM, SamplingParams
 from transformers import AutoProcessor
 from PIL import Image
+from config import (
+    MODEL_NAME, QUANTIZATION, MAX_MODEL_LEN,
+    GPU_MEMORY_UTILIZATION, TEMPERATURE, MAX_TOKENS
+)
 import json
-import base64
-import io
 
 class PhotoAgent:
-    def __init__(self, model_name="Qwen/Qwen2-VL-7B-Instruct-AWQ"):
-        self.llm = LLM(model=model_name, quantization="awq", max_model_len=4096)
-        self.processor = AutoProcessor.from_pretrained(model_name)
-
-    def _encode_image(self, image_path: str) -> str:
-        with open(image_path, "rb") as f:
-            return base64.b64encode(f.read()).decode("utf-8")
+    def __init__(self):
+        self.llm = LLM(
+            model=MODEL_NAME,
+            quantization=QUANTIZATION,
+            max_model_len=MAX_MODEL_LEN,
+            gpu_memory_utilization=GPU_MEMORY_UTILIZATION,
+        )
+        self.processor = AutoProcessor.from_pretrained(MODEL_NAME, min_pixels=256*28*28, max_pixels=1280*28*28)
 
     def analyze_and_plan(self, image_path: str) -> list[dict]:
-        image_b64 = self._encode_image(image_path)
-        
         prompt = [
             {"role": "system", "content": "You are a photo enhancement expert. Output ONLY a JSON array of tool calls."},
             {"role": "user", "content": [
-                {"type": "image", "image": f"data:image/jpeg;base64,{image_b64}"},
+                {"type": "image"},
                 {"type": "text", "text": (
-                    "Analyze this photo and suggest improvements. Available tools: "
+                    "Analyze this photo and suggest improvements using tools: "
                     "crop(bbox=[left,top,right,bottom]), adjust_exposure(factor=float), "
                     "adjust_contrast(factor=float), sharpen(factor=float), auto_enhance(). "
-                    "Return ONLY JSON array like: [{\"name\": \"crop\", \"args\": {\"bbox\": [0,0,100,100]}}, ...]"
+                    "Return ONLY JSON array of tool calls."
                 )}
             ]}
         ]
-        
-        sampling_params = SamplingParams(temperature=0.3, max_tokens=512, stop=["\n\n"])
-        outputs = self.llm.generate(prompt, sampling_params, use_tqdm=False)
-        
+
+        inputs = self.processor(prompt, images=[Image.open(image_path)], return_tensors="pt")
+        sampling_params = SamplingParams(temperature=TEMPERATURE, max_tokens=MAX_TOKENS)
+
+        outputs = self.llm.generate(inputs, sampling_params)
+
         try:
             text = outputs[0].outputs[0].text.strip()
             return json.loads(text)
         except Exception as e:
-            print(f"Parse error: {e}\nRaw: {text}")
+            print(f"JSON parse error: {e}\nRaw output: {text}")
             return []

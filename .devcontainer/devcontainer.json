@@ -1,0 +1,25 @@
+{
+	"name": "Perfect-Shot Dev (act only)",
+	"image": "mcr.microsoft.com/devcontainers/base:bullseye",
+	"features": {
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {
+			"moby": true,
+			"azureDnsAutoDetection": true,
+			"installDockerBuildx": true,
+			"installDockerComposeSwitch": true,
+			"version": "latest",
+			"dockerDashComposeVersion": "v2"
+		},
+		"ghcr.io/devcontainers-extra/features/act:1": {},
+		"ghcr.io/devcontainers/features/node:1": {}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-azuretools.vscode-docker"
+			]
+		}
+	},
+	"postCreateCommand": "/bin/bash ./.devcontainer/act.sh"
+	// "postCreateCommand": "act -j build-and-test --pull=false -P self-hosted=ghcr.io/catthehacker/ubuntu:act-latest -P gpu=ghcr.io/catthehacker/ubuntu:act-latest -P linux=ghcr.io/catthehacker/ubuntu:act-latest"
+}

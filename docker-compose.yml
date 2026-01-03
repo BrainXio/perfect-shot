@@ -5,17 +5,50 @@ services:
     volumes:
       - ./data/input:/data/input
       - ./data/output:/data/output
+      - ./data/cache:/data/cache
     working_dir: /app
     entrypoint: ["/app/entrypoint.sh"]
     environment:
       VISION_MODEL: ministral-3:3b
       INPUT_DIR: /data/input
       OUTPUT_DIR: /data/output
+      CACHE_DIR: /data/cache
       OLLAMA_HOST: ollama
-      # AGENT_LANGUAGE: Dutch
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      AWS_ACCESS_KEY_ID: perfectshotadmin
+      AWS_SECRET_ACCESS_KEY: perfectshotpassword123
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
     depends_on:
       ollama:
         condition: service_healthy
+      mlflow:
+        condition: service_healthy
+
+  # gradio:
+  #   build: .
+  #   command: python -m src.gradio_app
+  #   volumes:
+  #     - ./data/input:/data/input
+  #     - ./data/output:/data/output
+  #     - ./data/cache:/data/cache
+  #   ports:
+  #     - "7860:7860"
+  #   environment:
+  #     VISION_MODEL: ministral-3:3b
+  #     INPUT_DIR: /data/input
+  #     OUTPUT_DIR: /data/output
+  #     CACHE_DIR: /data/cache
+  #     OLLAMA_HOST: ollama
+  #     MLFLOW_TRACKING_URI: http://mlflow:5000
+  #     AWS_ACCESS_KEY_ID: perfectshotadmin
+  #     AWS_SECRET_ACCESS_KEY: perfectshotpassword123
+  #     MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+  #     # LOGO_URL: https://avatars.githubusercontent.com/u/168876326?s=200&v=4
+  #   depends_on:
+  #     ollama:
+  #       condition: service_healthy
+  #     mlflow:
+  #       condition: service_healthy
 
   ollama:
     image: ollama/ollama
@@ -47,5 +80,72 @@ services:
               count: all
               capabilities: [gpu]
 
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: mlflow
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: mlflowpass
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlflow -d mlflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: perfectshotadmin
+      MINIO_ROOT_PASSWORD: perfectshotpassword123
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+
+  mlflow:
+    image: python:3.11-slim
+    command: >
+      sh -c "
+      apt-get update && apt-get install -y curl ca-certificates &&
+      curl https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc &&
+      chmod +x /usr/local/bin/mc &&
+      mc alias set myminio http://minio:9000 perfectshotadmin perfectshotpassword123 &&
+      mc mb myminio/mlflow-artifacts --ignore-existing &&
+      pip install --quiet mlflow psycopg2-binary boto3 &&
+      mlflow server
+      --backend-store-uri postgresql://mlflow:mlflowpass@postgres:5432/mlflow
+      --default-artifact-root s3://mlflow-artifacts
+      --host 0.0.0.0
+      --port 5000
+      --allowed-hosts '*'"
+    ports:
+      - "5000:5000"
+    environment:
+      AWS_ACCESS_KEY_ID: perfectshotadmin
+      AWS_SECRET_ACCESS_KEY: perfectshotpassword123
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
 volumes:
   ollama-data:
+  minio-data:
+  postgres-data:

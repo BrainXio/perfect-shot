@@ -3,6 +3,11 @@ from PIL import Image, ImageEnhance, ImageDraw, ImageFont
 import cv2
 import numpy as np
 from pathlib import Path
+from logger import logger
+from config import LOCAL_LOGO_PATH
+import requests
+from io import BytesIO
+from config import LOGO_URL
 
 def crop(image: Image.Image, bbox: tuple[int, int, int, int]) -> Image.Image:
     return image.crop(bbox)
@@ -35,22 +40,72 @@ def compare(before: Image.Image, after: Image.Image) -> Image.Image:
     combined.paste(after, (before.width, 0))
     return combined
 
-def add_watermark(image: Image.Image, text: str = "Perfect-Shot") -> Image.Image:
-    draw = ImageDraw.Draw(image)
-    font_size = int(image.height * 0.08)
+def add_vignette(image: Image.Image, strength: float = 0.4) -> Image.Image:
+    """Subtle dark vignette on corners/edges"""
+    width, height = image.size
+    x = np.linspace(-1, 1, width)
+    y = np.linspace(-1, 1, height)
+    X, Y = np.meshgrid(x, y)
+    radius = np.sqrt(X**2 + Y**2)
+    mask = 1 - np.clip((radius - 0.8) / (1.4 - 0.8), 0, 1)**2
+    mask = 1 - strength * (1 - mask)
+    mask_img = Image.fromarray((mask * 255).astype(np.uint8))
+    mask_img = mask_img.resize(image.size, Image.BICUBIC)
+    dark = Image.new("RGB", image.size, (0, 0, 0))
+    vignette = Image.composite(dark, image, mask_img)
+    return Image.blend(image, vignette, strength)
+
+def professional_polish(image: Image.Image) -> Image.Image:
+    """Final professional polish: subtle vignette, color enhancement, gentle sharpen"""
+    img = image.copy()
+    
+    # Subtle color boost
+    img = ImageEnhance.Color(img).enhance(1.08)
+    
+    # Gentle contrast
+    img = ImageEnhance.Contrast(img).enhance(1.05)
+    
+    # Subtle vignette
+    img = add_vignette(img, strength=0.35)
+    
+    # Very light final sharpen
+    img = sharpen(img, factor=0.3)
+    
+    return img
+
+# src/tools.py (updated add_watermark only)
+
+def add_watermark(image: Image.Image) -> Image.Image:
     try:
-        font = ImageFont.truetype("arial.ttf", font_size)
-    except IOError:
-        font = ImageFont.load_default()
+        response = requests.get(LOGO_URL, timeout=10)
+        response.raise_for_status()
+        logo = Image.open(BytesIO(response.content)).convert("RGBA")
+    except Exception as e:
+        logger.warning(f"Failed to fetch logo: {e}")
+        return image
 
-    bbox = draw.textbbox((0, 0), text, font=font)
-    w = bbox[2] - bbox[0]
-    h = bbox[3] - bbox[1]
-    x, y = 30, image.height - h - 30
+    data = np.array(logo)
+    # Make bright green (high G, low R/B) transparent
+    mask = (data[:,:,1] > 150) & (data[:,:,0] < 120) & (data[:,:,2] < 120)
+    data[mask, 3] = 0  # Set alpha to 0
+    logo = Image.fromarray(data)
 
-    draw.text((x + 4, y + 4), text, fill="black", font=font)
-    draw.text((x, y), text, fill=(255, 255, 255, 220), font=font)
-    return image
+    max_size = min(image.width, image.height) // 10
+    logo.thumbnail((max_size, max_size), Image.LANCZOS)
+
+    # Full opacity for remaining parts
+    if logo.mode == "RGBA":
+        alpha = logo.split()[3]
+        alpha = ImageEnhance.Brightness(alpha).enhance(1.0)
+        logo.putalpha(alpha)
+
+    # Bottom-left corner
+    margin = 20
+    position = (margin, image.height - logo.height - margin)
+
+    rgba_image = image.convert("RGBA")
+    rgba_image.paste(logo, position, logo)
+    return rgba_image.convert("RGB")
 
 def get_opencv_metrics(image_path: str) -> dict:
     img = cv2.imread(image_path)

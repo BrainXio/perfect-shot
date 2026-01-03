@@ -1,17 +1,24 @@
 # src/models.py
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 class TechnicalQuality(BaseModel):
-    sharpness: str = ""
-    noise: str = ""
-    contrast: str = ""
-    exposure: str = ""
-    color_balance: str = ""
-    saturation: str = ""
-    dynamic_range: str = ""
-    distortion: str = ""
-    artifacts: str = ""
+    sharpness: int = 5
+    noise: int = 5
+    contrast: int = 5
+    exposure: int = 5
+    color_balance: int = 5
+    saturation: int = 5
+    dynamic_range: int = 5
+    distortion: int = 5
+    artifacts: int = 5
+
+class EnhancementSuggestions(BaseModel):
+    crop_bbox: Optional[List[int]] = None
+    exposure_factor: Optional[float] = None
+    contrast_factor: Optional[float] = None
+    sharpen_factor: Optional[float] = None
+    auto_enhance: Optional[bool] = None
 
 class ImageAnalysis(BaseModel):
     description: str = ""

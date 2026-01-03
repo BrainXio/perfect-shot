@@ -12,7 +12,7 @@ down:
 	docker compose down
 
 run:
-	docker compose up
+	docker compose up --force-recreate
 
 logs:
 	docker compose logs -f

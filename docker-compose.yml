@@ -7,9 +7,12 @@ services:
       - ./data/output:/data/output
       - ./data/cache:/data/cache
     working_dir: /app
-    entrypoint: ["/app/entrypoint.sh"]
+    command: streamlit run src/gui.py --server.port=8501 --server.address=0.0.0.0
+    # entrypoint: ["/app/entrypoint.sh"]\
+    ports:
+      - "8501:8501"
     environment:
-      VISION_MODEL: ministral-3:3b
+      # VISION_MODEL: ministral-3:8b
       INPUT_DIR: /data/input
       OUTPUT_DIR: /data/output
       CACHE_DIR: /data/cache
@@ -24,37 +27,11 @@ services:
       mlflow:
         condition: service_healthy
 
-  # gradio:
-  #   build: .
-  #   command: python -m src.gradio_app
-  #   volumes:
-  #     - ./data/input:/data/input
-  #     - ./data/output:/data/output
-  #     - ./data/cache:/data/cache
-  #   ports:
-  #     - "7860:7860"
-  #   environment:
-  #     VISION_MODEL: ministral-3:3b
-  #     INPUT_DIR: /data/input
-  #     OUTPUT_DIR: /data/output
-  #     CACHE_DIR: /data/cache
-  #     OLLAMA_HOST: ollama
-  #     MLFLOW_TRACKING_URI: http://mlflow:5000
-  #     AWS_ACCESS_KEY_ID: perfectshotadmin
-  #     AWS_SECRET_ACCESS_KEY: perfectshotpassword123
-  #     MLFLOW_S3_ENDPOINT_URL: http://minio:9000
-  #     # LOGO_URL: https://avatars.githubusercontent.com/u/168876326?s=200&v=4
-  #   depends_on:
-  #     ollama:
-  #       condition: service_healthy
-  #     mlflow:
-  #       condition: service_healthy
-
   ollama:
     image: ollama/ollama
     runtime: nvidia
-    ports:
-      - "11434:11434"
+    # ports:
+    #   - "11434:11434"
     volumes:
       - ollama-data:/root/.ollama
     environment:
@@ -102,9 +79,9 @@ services:
       MINIO_ROOT_PASSWORD: perfectshotpassword123
     volumes:
       - minio-data:/data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+    # ports:
+    #   - "9000:9000"
+    #   - "9001:9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 15s
@@ -127,8 +104,8 @@ services:
       --host 0.0.0.0
       --port 5000
       --allowed-hosts '*'"
-    ports:
-      - "5000:5000"
+    # ports:
+    #   - "5000:5000"
     environment:
       AWS_ACCESS_KEY_ID: perfectshotadmin
       AWS_SECRET_ACCESS_KEY: perfectshotpassword123

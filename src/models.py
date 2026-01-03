@@ -19,6 +19,8 @@ class EnhancementSuggestions(BaseModel):
     contrast_factor: Optional[float] = None
     sharpen_factor: Optional[float] = None
     auto_enhance: Optional[bool] = None
+    vignette_strength: Optional[float] = None
+    color_boost: Optional[float] = None
 
 class ImageAnalysis(BaseModel):
     description: str = ""
